@@ -1,0 +1,89 @@
+/**
+   BasicHTTPClient.ino
+   Created on: 24.05.2015
+*/
+/*
+   代码是arduino的
+*/
+
+#include <Arduino.h>
+
+#include <ESP8266WiFi.h>
+#include <ESP8266WiFiMulti.h>
+
+#include <ESP8266HTTPClient.h>
+
+#define USE_SERIAL Serial
+
+ESP8266WiFiMulti WiFiMulti;
+
+void setup() {
+
+  USE_SERIAL.begin(115200);
+  // USE_SERIAL.setDebugOutput(true);
+
+  USE_SERIAL.println();
+  USE_SERIAL.println();
+  USE_SERIAL.println();
+
+  for (uint8_t t = 4; t > 0; t--) {
+    USE_SERIAL.printf("[SETUP] WAIT %d...\n", t);
+    USE_SERIAL.flush();
+    delay(1000);
+  }
+
+  //设置为wifi模式
+  WiFi.mode(WIFI_STA);
+  WiFiMulti.addAP("welock", "123456789");
+  //通过GPIO2引脚来控制电位变化
+  pinMode(2, OUTPUT);
+}
+
+void loop() {
+  // wait for WiFi connection
+  if ((WiFiMulti.run() == WL_CONNECTED)) {
+
+    HTTPClient http;
+
+    USE_SERIAL.print("[HTTP] begin...\n");
+    // configure traged server and url
+    // post的地址
+    //	/usr/tomcat/tomcat/webapps/my/classes/HelloWorldServlet.java是Servlet的源码
+    http.begin("http://119.28.88.111:39999/my/test73"); //HTTP
+    http.addHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+  
+    USE_SERIAL.print("[HTTP] POST...\n");
+    //post内容
+    int httpCode = http.POST("lockid=lock1&");
+
+    // httpCode will be negative on error
+    if (httpCode > 0) {
+      // HTTP header has been send and Server response header has been handled
+      USE_SERIAL.printf("[HTTP] POST... code: %d\n", httpCode);
+      
+      // file found at server
+      if (httpCode == HTTP_CODE_OK) {
+        String payload = http.getString();
+        if(payload == "open")
+        {  
+	  //如果接收到的信息是open
+	  //gpio2引脚电位为low 开锁
+          digitalWrite(2, LOW);
+          USE_SERIAL.println("open");
+	  //延迟2秒 重新设置为高电位 关锁
+          delay(2000);
+          digitalWrite(2,HIGH); 
+        }
+        else
+        {
+          USE_SERIAL.println("lock");
+          }
+      }
+    } else {
+      USE_SERIAL.printf("[HTTP] POST... failed, error: %s\n", http.errorToString(httpCode).c_str());
+    }
+    http.end();
+  }
+  //post的频率
+  delay(700);
+}
